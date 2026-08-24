@@ -291,6 +291,11 @@
             <input type="text" id="maLopField" placeholder="VD: TTG/26-03">
           </div>
           <div class="field">
+            <label>Ngày báo cáo</label>
+            <input type="date" id="ngayBaoCaoField" lang="vi">
+            <div id="ngayBaoCaoHint" style="font-size:11px; color:#6B7280; margin-top:4px;"></div>
+          </div>
+          <div class="field">
             <label>Tên chương trình hiển thị (rút gọn)</label>
             <input type="text" id="progName">
           </div>
@@ -709,6 +714,11 @@ function parseColumnsFromRows(headers, responses) {
     if (outerTextRaw === 'nội dung' || outerTextRaw.startsWith('nội dung đào tạo')) groupNum = 1;
     else if (outerTextRaw.includes('phương pháp') || outerTextRaw.includes('hình thức đào tạo')) groupNum = 2;
     else if (outerTextRaw.includes('công tác tổ chức')) groupNum = 3;
+    else if (outerTextRaw.includes('công tác kiểm tra') || outerTextRaw.includes('kiểm tra')) groupNum = 4;
+    // Some exports leave "công tác kiểm tra" unbracketed (dotted numbering "4.1./4.2./4.3."
+    // instead of "[...]"), so outerTextRaw (which requires a bracket) never fires for them.
+    // Catch that case directly off the section-title text before the dotted sub-question.
+    else if (/^4\.\s*Đánh giá về công tác kiểm tra/i.test(h)) groupNum = 4;
     let question = cleanQuestionLabel(h, null);
     // The overall-improvement question ("Sau khóa học, Anh/Chị đã cải thiện về kiến thức/kỹ
     // năng...") is the only thing that belongs in "Đánh giá chung". Some exports number it
@@ -727,7 +737,7 @@ function parseColumnsFromRows(headers, responses) {
       }
     }
 
-    if (groupNum!==null && groupNum>=1 && groupNum<=3) {
+    if (groupNum!==null && groupNum>=1 && groupNum<=4) {
       const tot = counts[4]/total*100, kha=counts[3]/total*100, bt=counts[2]/total*100, hc=counts[1]/total*100;
       items.push({ label: question, total, avg, tot, kha, bt, hc, group: groupNum, counts: {...counts} });
     } else if (groupNum===5 || isChungCaiThien) {
@@ -919,8 +929,25 @@ function renderSegmentKpiRows(segments) {
   });
 }
 
+// The native <input type="date"> shows its closed-state text in whatever format the
+// browser/OS locale dictates (some show MM/DD/YYYY even with lang="vi" set). To avoid any
+// ambiguity, show an explicit "ngày/tháng/năm" confirmation line under the field.
+function updateNgayBaoCaoHint() {
+  const val = document.getElementById('ngayBaoCaoField').value; // "YYYY-MM-DD" or ""
+  const hint = document.getElementById('ngayBaoCaoHint');
+  if (!val) { hint.textContent = ''; return; }
+  const [yyyy, mm, dd] = val.split('-');
+  hint.textContent = `→ Sẽ hiển thị trong báo cáo: Hà Nội, ngày ${dd} tháng ${mm} năm ${yyyy}`;
+}
+document.getElementById('ngayBaoCaoField').addEventListener('input', updateNgayBaoCaoHint);
+document.getElementById('ngayBaoCaoField').addEventListener('change', updateNgayBaoCaoHint);
+
 function fillFields(p) {
   document.getElementById('maLopField').value = p.maLop || guessMaLopFromFileName(currentFileName) || '';
+  if (!document.getElementById('ngayBaoCaoField').value) {
+    document.getElementById('ngayBaoCaoField').value = new Date().toISOString().slice(0,10);
+  }
+  updateNgayBaoCaoHint();
   document.getElementById('progName').value = p.chuongTrinh ? shorten(p.chuongTrinh) : '';
   document.getElementById('locName').value = p.diaDiem || '';
   document.getElementById('timeName').value = p.thoiGian || '';
@@ -981,6 +1008,7 @@ document.getElementById('renderBtn').addEventListener('click', () => {
   const danhGiaVal = parseInt(document.getElementById('danhGiaField').value) || p.thamGia;
   const overrides = {
     maLop: document.getElementById('maLopField').value || p.maLop,
+    ngayBaoCao: document.getElementById('ngayBaoCaoField').value,
     chuongTrinh: document.getElementById('progName').value,
     diaDiem: document.getElementById('locName').value,
     thoiGian: document.getElementById('timeName').value,
@@ -1143,6 +1171,7 @@ function buildSummaryTableHtml(p) {
   const items1 = p.items.filter(it=>it.group===1);
   const items2 = p.items.filter(it=>it.group===2);
   const items3 = p.items.filter(it=>it.group===3);
+  const items4 = p.items.filter(it=>it.group===4);
 
   const cell = (n, total) => {
     const num = n || 0;
@@ -1160,6 +1189,7 @@ function buildSummaryTableHtml(p) {
 
   const head4 = `<thead><tr><th rowspan="2">TT</th><th rowspan="2">Nội dung đánh giá</th><th rowspan="2">Tổng số<br>phiếu</th><th rowspan="2">Điểm TB<br>(Tối đa 4đ)</th><th colspan="2">Tốt (4đ)</th><th colspan="2">Khá (3đ)</th><th colspan="2">Bình thường (2đ)</th><th colspan="2">Hạn chế (1đ)</th></tr><tr><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th></tr></thead>`;
   const head5 = `<thead><tr><th rowspan="2">TT</th><th rowspan="2">Nội dung</th><th rowspan="2">Tổng số<br>phiếu</th><th rowspan="2">Điểm TB<br>(Tối đa 5đ)</th><th colspan="2">Xuất sắc (5đ)</th><th colspan="2">Tốt (4đ)</th><th colspan="2">Khá (3đ)</th><th colspan="2">Bình thường (2đ)</th><th colspan="2">Hạn chế (1đ)</th></tr><tr><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th></tr></thead>`;
+  const head4kt = `<thead><tr><th rowspan="2">TT</th><th rowspan="2">Nội dung đánh giá</th><th rowspan="2">Tổng số<br>phiếu</th><th rowspan="2">Điểm TB<br>(Tối đa 4đ)</th><th colspan="2">Rất phù hợp (4đ)</th><th colspan="2">Phù hợp (3đ)</th><th colspan="2">Chưa phù hợp (2đ)</th><th colspan="2">Không phù hợp (1đ)</th></tr><tr><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th><th>SP</th><th>%</th></tr></thead>`;
 
   const gvRows = p.instructors.map((ins, i) => {
     const header = `<tr class="tbl-group-row"><td class="tbl-tt">${i+1}</td><td class="tbl-content" colspan="12"><b>Giảng viên: ${escapeHtml(ins.name)}${ins.spec ? ' - '+escapeHtml(ins.spec) : ''}</b></td></tr>`;
@@ -1177,7 +1207,8 @@ function buildSummaryTableHtml(p) {
   ${items2.length ? sec('2. Đánh giá về phương pháp, hình thức đào tạo', `<table class="summary-table">${head4}<tbody>${items2.map((it,i)=>scale4Row(i+1,it)).join('')}</tbody></table>`) : ''}
   ${items3.length ? sec('3. Công tác tổ chức, cơ sở vật chất', `<table class="summary-table">${head4}<tbody>${items3.map((it,i)=>scale4Row(i+1,it)).join('')}</tbody></table>`) : ''}
   ${p.instructors.length ? sec('4. Đánh giá về Giảng viên', `<table class="summary-table">${head5}<tbody>${gvRows}</tbody></table>`) : ''}
-  ${p.chungMetrics.length ? sec('5. Đánh giá chung', `<table class="summary-table">${head5}<tbody>${chungRows}</tbody></table>`) : ''}
+  ${items4.length ? sec('5. Đánh giá về công tác kiểm tra', `<table class="summary-table">${head4kt}<tbody>${items4.map((it,i)=>scale4Row(i+1,it)).join('')}</tbody></table>`) : ''}
+  ${p.chungMetrics.length ? sec('6. Đánh giá chung', `<table class="summary-table">${head5}<tbody>${chungRows}</tbody></table>`) : ''}
   `;
 }
 
@@ -1192,6 +1223,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
   const items1 = items.filter(it => it.group===1).map((it,i)=>({...it, num:i+1}));
   const items2 = items.filter(it => it.group===2).map((it,i)=>({...it, num:i+1}));
   const items3 = items.filter(it => it.group===3).map((it,i)=>({...it, num:i+1}));
+  const items4 = items.filter(it => it.group===4).map((it,i)=>({...it, num:i+1}));
   const chungItems = (p.chungMetrics||[]).filter(it => it.total>0);
 
   // Section numbers are computed dynamically (not hardcoded) so that adding the new "Nội
@@ -1204,6 +1236,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
   const numPhuongPhap = items2.length ? ++secNum : null;
   const numToChuc = items3.length ? ++secNum : null;
   const numGiangVien = ++secNum; // always shown
+  const numKiemTra = items4.length ? ++secNum : null;
   const numDanhGiaChung = chungItems.length ? ++secNum : null;
   const numHuuIch = ov.huuIch ? ++secNum : null;
   const numGopY = ov.gopY ? ++secNum : null;
@@ -1224,6 +1257,13 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
     </div>`).join('');
   const colCards = items2.map(renderColumnCard).join('');
   const barRows3 = items3.map(it => `
+    <div class="bar-row">
+      <div class="bar-label">${it.num}. ${it.label}</div>
+      <div class="bar-track">
+        ${seg(it.tot,'seg-tot')}${seg(it.kha,'seg-kha')}${seg(it.bt,'seg-bt')}${seg(it.hc,'seg-hc')}
+      </div>
+    </div>`).join('');
+  const barRows4 = items4.map(it => `
     <div class="bar-row">
       <div class="bar-label">${it.num}. ${it.label}</div>
       <div class="bar-track">
@@ -1267,10 +1307,19 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
     </div>`;
   }).join('');
 
-  const today = new Date();
-  const dd = String(today.getDate()).padStart(2,'0');
-  const mm = String(today.getMonth()+1).padStart(2,'0');
-  const yyyy = today.getFullYear();
+  // Report date now comes from the "Ngày báo cáo" date-picker field (ov.ngayBaoCao,
+  // format YYYY-MM-DD from <input type="date">) instead of being auto-filled with
+  // the system's current date. Falls back to today only if nothing was chosen.
+  let dd, mm, yyyy;
+  if (ov.ngayBaoCao) {
+    const parts = ov.ngayBaoCao.split('-'); // [YYYY, MM, DD]
+    yyyy = parts[0]; mm = parts[1]; dd = parts[2];
+  } else {
+    const today = new Date();
+    dd = String(today.getDate()).padStart(2,'0');
+    mm = String(today.getMonth()+1).padStart(2,'0');
+    yyyy = today.getFullYear();
+  }
 
   return `
   <div class="page">
@@ -1370,6 +1419,19 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
         <span><span class="dot" style="background:var(--hc);"></span>Hạn chế (1đ)</span>
       </div>
       <div class="gv-grid ${single?'single':''}">${gvCards}</div>
+
+      ${items4.length ? `
+      <div class="section-title"><span class="bar"></span>${numKiemTra}. ĐÁNH GIÁ VỀ CÔNG TÁC KIỂM TRA (Thang điểm 4)</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--tot);"></span>Rất phù hợp (4đ)</span>
+        <span><span class="dot" style="background:var(--kha);"></span>Phù hợp (3đ)</span>
+        <span><span class="dot" style="background:var(--bt);"></span>Chưa phù hợp (2đ)</span>
+        <span><span class="dot" style="background:var(--hc);"></span>Không phù hợp (1đ)</span>
+      </div>
+      <div class="bars-wrap">
+        ${barRows4}
+        <div class="axis"><span>0%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span><span>100%</span></div>
+      </div>` : ''}
 
       ${chungItems.length ? `
       <div class="section-title"><span class="bar"></span>${numDanhGiaChung}. ĐÁNH GIÁ CHUNG (Thang điểm 5)</div>
