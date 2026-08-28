@@ -53,6 +53,11 @@
   .nd-row textarea, .nd-row input { margin:0; }
   .nd-row .nd-remove { border:none; background:none; color:#B91C1C; font-size:19px; line-height:1; cursor:pointer; padding-top:10px; }
   .nd-row .nd-remove:hover { color:#7F1D1D; }
+  .ai-sum-row { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .ai-sum-btn { padding:6px 12px; font-size:12px; }
+  .ai-sum-status { font-size:11.5px; color:var(--grey); }
+  .ai-sum-status.err { color:#B91C1C; }
+  .ai-sum-status.ok { color:#1B7A43; }
   @media (max-width:720px) {
     .nd-row { grid-template-columns:1fr; }
     .nd-row .nd-tt { text-align:left; padding-top:0; }
@@ -311,6 +316,16 @@
             <label>Đối tượng</label>
             <textarea id="doiTuongField" rows="2" placeholder="VD: Cán bộ quản lý, chuyên viên..."></textarea>
           </div>
+          <div class="field" style="grid-column:1 / -1; display:none;">
+            <div id="geminiKeyCollapsed" style="display:none; align-items:center; gap:8px; font-size:12.5px; color:var(--grey);">
+              <span>🔑 Gemini API Key: <b style="color:#1B7A43;">✓ Đã lưu trên máy này</b></span>
+              <button type="button" id="geminiKeyEditBtn" class="btn btn-secondary" style="padding:4px 10px; font-size:11.5px;">Đổi key</button>
+            </div>
+            <div id="geminiKeyExpanded">
+              <label>🔑 Gemini API Key (dùng để tổng hợp ý kiến mục 7/8 bằng AI — chỉ lưu trên máy bạn, không gửi đi đâu khác)</label>
+              <input type="password" id="geminiApiKey" placeholder="Dán API key Gemini vào đây (lấy tại aistudio.google.com/apikey)">
+            </div>
+          </div>
           <div class="field">
             <label>Agribank Chi nhánh (dùng cho báo cáo CSVC)</label>
             <input type="text" id="chiNhanhField" placeholder="VD: Nghệ An">
@@ -347,11 +362,19 @@
           <div id="singleTextFields" style="display:contents;">
             <div class="field" style="grid-column:1 / -1;">
               <label>7. Theo Anh/chị, nội dung hữu ích nhất của khóa học này là gì?</label>
-              <textarea id="huuIchField" rows="2" placeholder="Tổng hợp/nhập nội dung hữu ích nhất..."></textarea>
+              <textarea id="huuIchField" rows="4" placeholder="Tổng hợp/nhập nội dung hữu ích nhất..."></textarea>
+              <div class="ai-sum-row">
+                <button type="button" class="btn btn-secondary ai-sum-btn" data-target="huuIchField" data-source="huuIchTexts">✨ Tổng hợp bằng AI</button>
+                <span class="ai-sum-status" data-for="huuIchField"></span>
+              </div>
             </div>
             <div class="field" style="grid-column:1 / -1;">
               <label>8. Ý kiến góp ý khác</label>
-              <textarea id="gopYField" rows="2" placeholder="Tổng hợp/nhập ý kiến góp ý khác..."></textarea>
+              <textarea id="gopYField" rows="4" placeholder="Tổng hợp/nhập ý kiến góp ý khác..."></textarea>
+              <div class="ai-sum-row">
+                <button type="button" class="btn btn-secondary ai-sum-btn" data-target="gopYField" data-source="gopYTexts">✨ Tổng hợp bằng AI</button>
+                <span class="ai-sum-status" data-for="gopYField"></span>
+              </div>
             </div>
           </div>
           <div class="field">
@@ -629,9 +652,15 @@ function parseColumnsFromRows(headers, responses) {
   const chungMetrics = [];
   const instructorMap = new Map();
   const instructorOrder = [];
+  const huuIchTexts = [];
+  const gopYTexts = [];
 
   const oldInstructorRe = /Đánh giá Giảng viên\s*:?\s*(.*?)\s*-\s*Nội dung giảng:\s*(.*?)\s*\[(.*)\]\s*$/;
   const newInstructorRe = /Đánh giá Giảng viên:?\s*(.*?)\s+-\s+(.*?)\s*\[(.*)\]\s*$/s;
+  // Some exports label the instructor block "Đánh giá về <Tên GV> - <Chuyên đề> [...]" instead of
+  // "Đánh giá Giảng viên ..." — same shape, just without the word "Giảng viên", so it would
+  // otherwise fall through to the generic numbered-group classifier and get miscategorized.
+  const aboutInstructorRe = /Đánh giá về\s*:?\s*(.*?)\s*-\s*(.*?)\s*\[(.*)\]\s*$/s;
   const nameRe = /[Gg]i[ảa]ng\s*vi[êe]n\s*[-:]?\s*([^\n\[]+)/;
   const assistantRe = /Tr[ợo]\s*[Gg]i[ảa]ng\s*[-:]?\s*([^\n\[]+)/;
 
@@ -658,8 +687,22 @@ function parseColumnsFromRows(headers, responses) {
 
     // Open-ended text questions (e.g. "nội dung hữu ích nhất...", "ý kiến góp ý khác") must
     // never be treated as rated columns — a free-text answer that happens to literally say
-    // "Tốt" or "Bình thường" would otherwise get miscounted as a Likert score.
-    if (/nội dung hữu ích nhất|ý kiến góp ý/i.test(h)) continue;
+    // "Tốt" or "Bình thường" would otherwise get miscounted as a Likert score. Collect their
+    // raw text answers instead (used later to auto-summarize with AI).
+    if (/nội dung hữu ích nhất/i.test(h)) {
+      for (const r of responses) {
+        const v = (r[c]||'').toString().trim();
+        if (v) huuIchTexts.push(v);
+      }
+      continue;
+    }
+    if (/ý kiến góp ý/i.test(h)) {
+      for (const r of responses) {
+        const v = (r[c]||'').toString().trim();
+        if (v) gopYTexts.push(v);
+      }
+      continue;
+    }
 
     const counts = {1:0,2:0,3:0,4:0,5:0};
     let total = 0;
@@ -680,6 +723,10 @@ function parseColumnsFromRows(headers, responses) {
       if (newM) {
         insInfo = { name: newM[1].trim(), spec: newM[2].trim(), criterion: newM[3].trim() };
       } else {
+        const aboutM = h.match(aboutInstructorRe);
+        if (aboutM) {
+          insInfo = { name: aboutM[1].trim(), spec: aboutM[2].trim(), criterion: aboutM[3].trim() };
+        } else {
         // Only look for the instructor's name in the part of the header BEFORE the
         // bracketed criterion, otherwise phrases like "...của giảng viên]" inside the
         // criterion text itself get mistaken for the name.
@@ -691,6 +738,7 @@ function parseColumnsFromRows(headers, responses) {
         } else if (assistantRe.test(preBracket)) {
           const nm = preBracket.match(assistantRe)[1].trim();
           insInfo = { name: 'Trợ giảng ' + nm, spec: '', criterion: cleanQuestionLabel(h, nm) };
+        }
         }
       }
     }
@@ -756,7 +804,7 @@ function parseColumnsFromRows(headers, responses) {
     return { ...ins, overall: avgs.length ? avgs.reduce((a,b)=>a+b,0)/avgs.length : 0 };
   });
 
-  return { items, instructors, chungMetrics, thamGia: responses.length };
+  return { items, instructors, chungMetrics, thamGia: responses.length, huuIchTexts, gopYTexts };
 }
 
 function parseRawResponses(rows) {
@@ -774,6 +822,8 @@ function parseRawResponses(rows) {
       items: core.items,
       instructors: core.instructors,
       chungMetrics: core.chungMetrics,
+      huuIchTexts: core.huuIchTexts,
+      gopYTexts: core.gopYTexts,
       lapBangName:'', truongPhongName:'',
     };
   }
@@ -796,6 +846,8 @@ function parseRawResponses(rows) {
       items: core.items,
       instructors: core.instructors,
       chungMetrics: core.chungMetrics,
+      huuIchTexts: core.huuIchTexts,
+      gopYTexts: core.gopYTexts,
     };
   });
 
@@ -894,7 +946,7 @@ function getSegmentKpiValues() {
 function renderSegmentKpiRows(segments) {
   const container = document.getElementById('segmentKpiFields');
   container.innerHTML = '';
-  segments.forEach(seg => {
+  segments.forEach((seg, segIdx) => {
     const row = document.createElement('div');
     row.className = 'segment-kpi-row';
     row.style.cssText = 'border:1px solid var(--border); border-radius:10px; padding:12px 14px;';
@@ -916,11 +968,19 @@ function renderSegmentKpiRows(segments) {
       </div>
       <div class="field" style="margin-bottom:12px;">
         <label>7. Nội dung hữu ích nhất của khóa học này</label>
-        <textarea class="seg-huuIch" rows="2" placeholder="Tổng hợp/nhập nội dung hữu ích nhất..."></textarea>
+        <textarea class="seg-huuIch" rows="4" placeholder="Tổng hợp/nhập nội dung hữu ích nhất..."></textarea>
+        <div class="ai-sum-row">
+          <button type="button" class="btn btn-secondary ai-sum-btn" data-target-class="seg-huuIch" data-source="huuIchTexts" data-seg-index="${segIdx}">✨ Tổng hợp bằng AI</button>
+          <span class="ai-sum-status" data-for-seg="${segIdx}-huuIch"></span>
+        </div>
       </div>
       <div class="field">
         <label>8. Ý kiến góp ý khác</label>
-        <textarea class="seg-gopY" rows="2" placeholder="Tổng hợp/nhập ý kiến góp ý khác..."></textarea>
+        <textarea class="seg-gopY" rows="4" placeholder="Tổng hợp/nhập ý kiến góp ý khác..."></textarea>
+        <div class="ai-sum-row">
+          <button type="button" class="btn btn-secondary ai-sum-btn" data-target-class="seg-gopY" data-source="gopYTexts" data-seg-index="${segIdx}">✨ Tổng hợp bằng AI</button>
+          <span class="ai-sum-status" data-for-seg="${segIdx}-gopY"></span>
+        </div>
       </div>`;
     row.querySelector('.seg-trieuTap').value = seg.triGiaTap || seg.thamGia || '';
     row.querySelector('.seg-thamGia').value = seg.thamGia || '';
@@ -1031,6 +1091,160 @@ document.getElementById('renderBtn').addEventListener('click', () => {
   renderReport(p, overrides);
   printBlock.style.display='block';
   reportRoot.scrollIntoView({behavior:'smooth'});
+});
+
+// ---- Tổng hợp ý kiến tự do (mục 7/8) bằng Gemini AI ----
+// Key mặc định gắn sẵn để dùng nội bộ, không cần người dùng tự nhập.
+const DEFAULT_GEMINI_API_KEY = 'AIzaSyCaLLqtDQkPRlSvpKhG9C7q5F_savFbdOg';
+const geminiKeyCollapsed = document.getElementById('geminiKeyCollapsed');
+const geminiKeyExpanded = document.getElementById('geminiKeyExpanded');
+function refreshGeminiKeyUI() {
+  let saved = '';
+  try { saved = localStorage.getItem('gemini_api_key') || ''; } catch(e) {}
+  if (!saved) {
+    saved = DEFAULT_GEMINI_API_KEY;
+    try { localStorage.setItem('gemini_api_key', saved); } catch(e) {}
+  }
+  if (saved) {
+    document.getElementById('geminiApiKey').value = saved;
+    geminiKeyCollapsed.style.display = 'flex';
+    geminiKeyExpanded.style.display = 'none';
+  } else {
+    geminiKeyCollapsed.style.display = 'none';
+    geminiKeyExpanded.style.display = 'block';
+  }
+}
+refreshGeminiKeyUI();
+document.getElementById('geminiKeyEditBtn').addEventListener('click', () => {
+  geminiKeyCollapsed.style.display = 'none';
+  geminiKeyExpanded.style.display = 'block';
+  document.getElementById('geminiApiKey').focus();
+});
+document.getElementById('geminiApiKey').addEventListener('change', () => {
+  try { localStorage.setItem('gemini_api_key', document.getElementById('geminiApiKey').value.trim()); } catch(e) {}
+  refreshGeminiKeyUI();
+});
+
+function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+// gemini-2.5-flash đã ngừng cấp cho key mới; gemini-3.7-flash hay quá tải.
+// Dùng gemini-3.6-flash làm chính (Google khuyến nghị thay thế 2.5-flash),
+// nếu quá tải thì tự chuyển sang 3.7-flash.
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.7-flash'];
+
+async function callGeminiSummary(apiKey, texts, kind, onStatus) {
+  const label = kind === 'huuIch' ? 'nội dung hữu ích nhất của khóa học' : 'ý kiến góp ý, đề xuất';
+  const listText = texts.map((t,i) => `${i+1}. ${t}`).join('\n');
+  const prompt = `Dưới đây là các câu trả lời của học viên cho câu hỏi về ${label} trong một khóa đào tạo. Hãy tổng hợp thành 1 đoạn văn ngắn gọn (khoảng 3-6 câu), văn phong báo cáo hành chính tiếng Việt, nêu bật các ý chính hoặc lặp lại nhiều nhất, KHÔNG liệt kê lại từng câu trả lời riêng lẻ, không thêm bình luận hay tiêu đề thừa — chỉ trả về đúng đoạn văn tổng hợp. Nếu hầu hết câu trả lời là "Không" hoặc để trống thì chỉ cần ghi ngắn gọn "Đa số học viên không có ý kiến/đề xuất thêm.".\n\nCác câu trả lời:\n${listText}`;
+
+  const ATTEMPTS_PER_MODEL = 2;
+  let lastErr;
+  for (let mi = 0; mi < GEMINI_MODELS.length; mi++) {
+    const model = GEMINI_MODELS[mi];
+    for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt++) {
+      try {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          const overloaded = resp.status === 503 || resp.status === 429 || resp.status >= 500;
+          const modelGone = resp.status === 404; // model bị Google gỡ/đổi tên — chuyển model ngay, không thử lại
+          const hasNextModel = mi < GEMINI_MODELS.length - 1;
+          if (modelGone && hasNextModel) {
+            if (onStatus) onStatus(`Model "${model}" không còn khả dụng — chuyển sang "${GEMINI_MODELS[mi+1]}"...`);
+            lastErr = new Error(`Gemini API lỗi (${resp.status}): ${errText.slice(0,200)}`);
+            break; // sang model tiếp theo, không lặp lại attempt cho model này
+          }
+          const hasNextTry = attempt < ATTEMPTS_PER_MODEL || hasNextModel;
+          if (overloaded && hasNextTry) {
+            const movingToNextModel = attempt === ATTEMPTS_PER_MODEL && hasNextModel;
+            const waitMs = movingToNextModel ? 500 : 1500 * Math.pow(2, attempt - 1);
+            if (onStatus) {
+              onStatus(movingToNextModel
+                ? `Model ${model} đang quá tải — chuyển sang model dự phòng "${GEMINI_MODELS[mi+1]}"...`
+                : `Máy chủ Gemini đang bận (lỗi ${resp.status}) — tự thử lại sau ${Math.round(waitMs/1000)}s...`);
+            }
+            await sleep(waitMs);
+            lastErr = new Error(`Gemini API lỗi (${resp.status}): ${errText.slice(0,200)}`);
+            continue;
+          }
+          throw new Error(`Gemini API lỗi (${resp.status}): ${errText.slice(0,200)}`);
+        }
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('Không nhận được nội dung trả về từ Gemini.');
+        return text.trim();
+      } catch (err) {
+        lastErr = err;
+        const hasNextTry = attempt < ATTEMPTS_PER_MODEL || mi < GEMINI_MODELS.length - 1;
+        if (hasNextTry && /Failed to fetch|NetworkError/i.test(err.message || '')) {
+          const waitMs = 1500 * Math.pow(2, attempt - 1);
+          if (onStatus) onStatus(`Lỗi kết nối — tự thử lại sau ${Math.round(waitMs/1000)}s...`);
+          await sleep(waitMs);
+          continue;
+        }
+        if (!hasNextTry) break;
+      }
+    }
+  }
+  throw lastErr;
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.ai-sum-btn');
+  if (!btn) return;
+  const apiKey = document.getElementById('geminiApiKey').value.trim();
+  const p = window.__lastParsed;
+  const kind = btn.dataset.source === 'huuIchTexts' ? 'huuIch' : 'gopY';
+  let texts = [], textarea, statusEl;
+  if (btn.dataset.segIndex !== undefined) {
+    const idx = parseInt(btn.dataset.segIndex, 10);
+    const seg = p && p.segments && p.segments[idx];
+    texts = (seg && seg[btn.dataset.source]) || [];
+    const row = btn.closest('.segment-kpi-row');
+    textarea = row.querySelector('.' + btn.dataset.targetClass);
+    statusEl = document.querySelector(`.ai-sum-status[data-for-seg="${idx}-${kind}"]`);
+  } else {
+    texts = (p && p[btn.dataset.source]) || [];
+    textarea = document.getElementById(btn.dataset.target);
+    statusEl = document.querySelector(`.ai-sum-status[data-for="${btn.dataset.target}"]`);
+  }
+  if (!apiKey) {
+    statusEl.className = 'ai-sum-status err';
+    statusEl.textContent = 'Chưa nhập Gemini API Key ở phía trên.';
+    const keyField = document.getElementById('geminiApiKey');
+    geminiKeyCollapsed.style.display = 'none';
+    geminiKeyExpanded.style.display = 'block';
+    keyField.scrollIntoView({ behavior:'smooth', block:'center' });
+    keyField.focus();
+    return;
+  }
+  if (!texts.length) {
+    statusEl.className = 'ai-sum-status err';
+    statusEl.textContent = 'Không tìm thấy câu trả lời nào trong file Excel cho mục này.';
+    return;
+  }
+  statusEl.className = 'ai-sum-status';
+  statusEl.textContent = `Đang tổng hợp ${texts.length} câu trả lời bằng AI...`;
+  btn.disabled = true;
+  try {
+    const summary = await callGeminiSummary(apiKey, texts, kind, (msg) => {
+      statusEl.className = 'ai-sum-status';
+      statusEl.textContent = msg;
+    });
+    textarea.value = summary;
+    statusEl.className = 'ai-sum-status ok';
+    statusEl.textContent = `✓ Đã tổng hợp từ ${texts.length} câu trả lời — bạn có thể chỉnh sửa lại nội dung phía trên nếu cần.`;
+  } catch (err) {
+    console.error(err);
+    statusEl.className = 'ai-sum-status err';
+    statusEl.textContent = err.message || 'Lỗi khi gọi Gemini API.';
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
