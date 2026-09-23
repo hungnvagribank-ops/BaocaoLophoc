@@ -136,15 +136,18 @@
   .subsection-title { font-size:11.5px; font-weight:700; color:#374151; margin:0 0 10px 0; }
   .gv-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:13px; margin-bottom:22px; }
   .gv-grid.single { grid-template-columns:1fr; }
-  .gv-metrics-row { display:flex; gap:24px; margin-top:9px; }
-  .gv-metrics-row .gv-metric { flex:1; margin-top:0; }
+  .gv-grid.stack { grid-template-columns:1fr; }
+  .gv-metrics-row { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:9px 24px; margin-top:9px; }
+  .gv-metrics-row .gv-metric { margin-top:0; }
   .gv-card { border:1px solid #ECEDEE; border-radius:12px; padding:13px 15px; }
   .gv-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; gap:10px; }
   .gv-name { color:var(--maroon); font-weight:800; font-size:12px; }
   .gv-spec { color:#9CA3AF; font-size:9px; margin-top:1px; }
   .gv-score { background:#E8F8EF; color:var(--tot); font-weight:800; font-size:10.5px; border-radius:14px; padding:3px 10px; white-space:nowrap; flex-shrink:0; }
   .gv-metric { margin-top:8px; }
-  .gv-metric-label { display:flex; justify-content:space-between; font-size:9px; color:#374151; font-weight:600; margin-bottom:3px; }
+  .gv-metric-label { display:flex; justify-content:space-between; align-items:baseline; gap:6px; font-size:9px; line-height:1.35; min-height:24px; color:#374151; font-weight:600; margin-bottom:3px; }
+  .gv-metric-label > span:first-child:not(:only-child) { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
+  .gv-metric-label > span:last-child:not(:only-child) { flex:0 0 auto; white-space:nowrap; }
   .gv-bar-track { height:6.5px; background:#EEF0F2; border-radius:5px; overflow:hidden; }
   .gv-bar-fill { height:100%; border-radius:5px; background:var(--tot); }
   .gv-seg-track { height:14px; background:#EEF0F2; border-radius:5px; overflow:hidden; display:flex; }
@@ -164,6 +167,7 @@
   .sign-time { font-size:8px; color:#9CA3AF; }
 
   .summary-sec-title { font-weight:800; font-size:11px; color:var(--maroon-dark); margin:14px 0 5px 0; }
+  .gv-sub-title { font-weight:800; font-size:11.5px; color:var(--maroon-dark); margin:6px 0 8px 0; }
   .summary-table { width:100%; border-collapse:collapse; margin-bottom:6px; font-size:8px; }
   .summary-table th, .summary-table td { border:1px solid #D1D5DB; padding:3px 4px; text-align:center; }
   .summary-table th { background:#F3F4F6; font-weight:700; color:#374151; }
@@ -235,14 +239,18 @@
     .axis { padding-left:130px; font-size:7px; }
     .gv-grid { gap:8px; margin-bottom:10px; grid-template-columns:repeat(2,1fr) !important; }
     .gv-grid.single { grid-template-columns:repeat(2,1fr) !important; }
-    .gv-metrics-row { flex-direction:column; gap:4px; margin-top:5px; }
+    /* .stack (instructor self-survey cards, with long free-text answers) always stays
+       one-per-row in print too — unlike .single, which is still forced to 2 columns above
+       for the compact bar-chart cards where two side-by-side fits fine on paper. */
+    .gv-grid.stack { grid-template-columns:1fr !important; }
+    .gv-metrics-row { gap:4px 16px; margin-top:5px; }
     .gv-card { padding:8px 10px; }
     .gv-top { margin-bottom:2px; }
     .gv-name { font-size:10.5px; }
     .gv-spec { font-size:7.5px; }
     .gv-score { font-size:9px; padding:2px 8px; }
     .gv-metric { margin-top:4px; }
-    .gv-metric-label { font-size:7.5px; margin-bottom:2px; }
+    .gv-metric-label { font-size:7.5px; line-height:1.35; min-height:20px; margin-bottom:2px; }
     .gv-bar-track { height:5px; }
     .gv-seg-track { height:10px; }
     .tail-group .gv-card { padding:8px 10px; font-size:9.5px !important; line-height:1.4 !important; margin-bottom:8px !important; }
@@ -256,6 +264,7 @@
     .sign-space { flex:1; min-height:77px; }
     .sign-name { font-size:10.5px; margin:2px 0 1px 0; }
     .summary-sec-title { font-size:9.5px; margin:8px 0 3px 0; }
+    .gv-sub-title { font-size:9.5px; margin:5px 0 5px 0; }
     .summary-table { font-size:6.5px; margin-bottom:3px; }
     .curriculum-table { font-size:9.5px; margin-bottom:12px; }
     .curriculum-table th, .curriculum-table td { padding:5px 7px; }
@@ -279,6 +288,21 @@
         <div>📄 Kéo thả file Excel vào đây, hoặc <b>bấm để chọn file</b></div>
       </label>
       <div id="status" class="status"></div>
+
+      <div class="app-sub" style="margin-top:16px;">Tải lên file "Phiếu khảo sát ý kiến Giảng viên về lớp học" (.xlsx) — không bắt buộc. Nếu có, báo cáo sẽ hiện thêm mục "Giảng viên đánh giá".</div>
+      <label class="drop" id="dropZone2">
+        <input type="file" id="fileInput2" accept=".xlsx,.xls">
+        <div>📄 Kéo thả file khảo sát Giảng viên vào đây, hoặc <b>bấm để chọn file</b></div>
+      </label>
+      <div id="status2" class="status"></div>
+      <div id="instructorSurveyList" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;"></div>
+
+      <div class="app-sub" style="margin-top:16px;">Tải lên file "Phiếu nhận xét, đánh giá lớp học của cán bộ quản lý lớp" (.docx) — không bắt buộc. Nếu có, báo cáo sẽ hiện thêm mục "Cán bộ quản lý lớp đánh giá" ở cuối.</div>
+      <label class="drop" id="dropZone3">
+        <input type="file" id="fileInput3" accept=".docx">
+        <div>📄 Kéo thả file Word (Phiếu CBQLL) vào đây, hoặc <b>bấm để chọn file</b></div>
+      </label>
+      <div id="status3" class="status"></div>
 
       <div id="fieldsBlock" class="hidden">
         <div class="field-grid">
@@ -409,6 +433,172 @@ dropZone.addEventListener('drop', e => {
   if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+const dropZone2 = document.getElementById('dropZone2');
+const fileInput2 = document.getElementById('fileInput2');
+const status2El = document.getElementById('status2');
+
+dropZone2.addEventListener('dragover', e => { e.preventDefault(); dropZone2.classList.add('drag'); });
+dropZone2.addEventListener('dragleave', () => dropZone2.classList.remove('drag'));
+dropZone2.addEventListener('drop', e => {
+  e.preventDefault(); dropZone2.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleInstructorSurveyFile(e.dataTransfer.files[0]);
+});
+fileInput2.addEventListener('change', e => { if (e.target.files.length) handleInstructorSurveyFile(e.target.files[0]); });
+
+function renderInstructorSurveyList() {
+  const container = document.getElementById('instructorSurveyList');
+  const entries = window.__instructorSurveyData || [];
+  if (!entries.length) { container.innerHTML = ''; return; }
+  container.innerHTML = entries.map((e,i) => `
+    <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:12px;">
+      <span><b>${e.name || '(không có tên)'}</b>${e.org ? ' — ' + e.org : ''}</span>
+      <button type="button" data-idx="${i}" class="instructorSurveyRemoveBtn" style="border:none; background:none; color:#B91C1C; font-size:16px; line-height:1; cursor:pointer;">✕</button>
+    </div>`).join('');
+  container.querySelectorAll('.instructorSurveyRemoveBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'));
+      window.__instructorSurveyData.splice(idx, 1);
+      renderInstructorSurveyList();
+    });
+  });
+}
+
+function handleInstructorSurveyFile(file) {
+  status2El.className = 'status'; status2El.textContent = 'Đang đọc file...';
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb2 = XLSX.read(data, { type:'array', cellDates:false });
+      const sheetName = wb2.SheetNames.find(n => /câu trả lời|tra loi|trả lời/i.test(n)) || wb2.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb2.Sheets[sheetName], { header:1, defval:null, raw:true });
+      const entries = parseInstructorSurveyRows(rows);
+      window.__instructorSurveyData = entries;
+      renderInstructorSurveyList();
+      status2El.className = 'status ok';
+      status2El.textContent = entries.length
+        ? `✓ Đã đọc "${file.name}" — tìm thấy ${entries.length} giảng viên. Bỏ bớt dòng thừa (nếu có) bên dưới rồi bấm "Dựng báo cáo".`
+        : `⚠ Đọc được file nhưng không tìm thấy dữ liệu giảng viên hợp lệ trong "${file.name}".`;
+    } catch (err) {
+      window.__instructorSurveyData = null;
+      renderInstructorSurveyList();
+      status2El.className = 'status err';
+      status2El.textContent = 'Lỗi đọc file: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---- Phiếu nhận xét, đánh giá lớp học của cán bộ quản lý lớp (.docx) ----
+const dropZone3 = document.getElementById('dropZone3');
+const fileInput3 = document.getElementById('fileInput3');
+const status3El = document.getElementById('status3');
+
+dropZone3.addEventListener('dragover', e => { e.preventDefault(); dropZone3.classList.add('drag'); });
+dropZone3.addEventListener('dragleave', () => dropZone3.classList.remove('drag'));
+dropZone3.addEventListener('drop', e => {
+  e.preventDefault(); dropZone3.classList.remove('drag');
+  if (e.dataTransfer.files.length) handleManagerReviewFile(e.dataTransfer.files[0]);
+});
+fileInput3.addEventListener('change', e => { if (e.target.files.length) handleManagerReviewFile(e.target.files[0]); });
+
+// Reads every paragraph of word/document.xml, in document order, as plain text. Word
+// splits a visible line across many <w:r> runs (spell-check markers, revision ids), but
+// concatenating all <w:t> nodes inside one <w:p> reassembles the full paragraph text
+// regardless of how it was split, which is all we need — we aren't tracking formatting.
+function readDocxParagraphs(arrayBuffer) {
+  const zip = new PizZip(arrayBuffer);
+  const xmlFile = zip.file('word/document.xml');
+  if (!xmlFile) throw new Error('Không tìm thấy nội dung (word/document.xml) trong file .docx');
+  const xmlDoc = new DOMParser().parseFromString(xmlFile.asText(), 'application/xml');
+  if (xmlDoc.getElementsByTagName('parsererror').length) throw new Error('File .docx bị lỗi định dạng, không đọc được.');
+  const paraNodes = xmlDoc.getElementsByTagName('w:p');
+  const paragraphs = [];
+  for (let i = 0; i < paraNodes.length; i++) {
+    const tNodes = paraNodes[i].getElementsByTagName('w:t');
+    let text = '';
+    for (let j = 0; j < tNodes.length; j++) text += tNodes[j].textContent;
+    text = text.trim();
+    if (text) paragraphs.push(text);
+  }
+  return paragraphs;
+}
+
+// Splits the paragraph list into the three numbered sections of the "Phiếu nhận xét, đánh
+// giá lớp học của cán bộ quản lý lớp" template. Matched by wording (not by "I."/"II."/"III."
+// prefixes) so the parser still works if a copy of the form numbers headings differently —
+// same approach used elsewhere in this file for the Excel column headers.
+function extractManagerReviewSections(paragraphs) {
+  // The III. heading and its blank-fill dots sit on the SAME paragraph in the template
+  // ("III. Đánh giá chung và Kiến nghị ......"), so someone filling the form by typing over
+  // the dots often ends up with their answer on that same line rather than a new paragraph.
+  // Header matching therefore also captures whatever text follows the heading on that line
+  // (see afterHeader/clean below), in addition to any following paragraphs.
+  const headerRe = {
+    I:   /t[ìi]nh\s*h[ìi]nh\s*h[ọo]c\s*t[ậa]p.{0,20}ch[ấa]p\s*h[àa]nh\s*k[ỷy]\s*lu[ậa]t/i,
+    II:  /c[ôo]ng\s*t[áa]c\s*t[ổo]\s*ch[ứu]c.{0,30}v[ấa]n\s*đ[ềe]\s*ph[áa]t\s*sinh/i,
+    III: /đ[áa]nh\s*gi[áa]\s*chung.{0,10}ki[ếe]n\s*ngh[ịi]/i,
+  };
+  const isSignature = s => /^c[áa]n\s*b[ộo]\s*qu[ảa]n\s*l[ýy]\s*l[ớo]p\s*$/i.test(s) || /k[ýy]\s*v[àa]\s*ghi\s*r[õo]\s*h[ọo]\s*t[êe]n/i.test(s);
+
+  const clean = s => s
+    .replace(/^[\s:.\-–]+/, '')      // leading colon/dash/dot-blank left over from the template
+    .replace(/\.{4,}/g, '')          // leftover unfilled dot-blanks anywhere else in the text
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+  const afterHeader = (s, re) => {
+    const m = s.match(re);
+    return m ? clean(s.slice(m.index + m[0].length)) : '';
+  };
+
+  const idx = { I: -1, II: -1, III: -1, end: paragraphs.length };
+  const inline = { I: '', II: '', III: '' };
+  paragraphs.forEach((s, i) => {
+    if (idx.I === -1 && headerRe.I.test(s)) { idx.I = i; inline.I = afterHeader(s, headerRe.I); }
+    else if (idx.II === -1 && headerRe.II.test(s)) { idx.II = i; inline.II = afterHeader(s, headerRe.II); }
+    else if (idx.III === -1 && headerRe.III.test(s)) { idx.III = i; inline.III = afterHeader(s, headerRe.III); }
+    else if (idx.end === paragraphs.length && (idx.I !== -1 || idx.II !== -1 || idx.III !== -1) && isSignature(s)) idx.end = i;
+  });
+
+  const block = (start, inlineText, stop) => {
+    const rest = start === -1 ? '' : clean(paragraphs.slice(start + 1, stop).join('\n'));
+    return [inlineText, rest].filter(Boolean).join('\n');
+  };
+
+  return {
+    tinhHinhHocTap: block(idx.I, inline.I, idx.II !== -1 ? idx.II : (idx.III !== -1 ? idx.III : idx.end)),
+    congTacToChuc: block(idx.II, inline.II, idx.III !== -1 ? idx.III : idx.end),
+    danhGiaChung: block(idx.III, inline.III, idx.end),
+    foundAny: idx.I !== -1 || idx.II !== -1 || idx.III !== -1,
+  };
+}
+
+function handleManagerReviewFile(file) {
+  status3El.className = 'status'; status3El.textContent = 'Đang đọc file...';
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const paragraphs = readDocxParagraphs(e.target.result);
+      const sections = extractManagerReviewSections(paragraphs);
+      if (!sections.foundAny) {
+        window.__managerReviewData = null;
+        status3El.className = 'status err';
+        status3El.textContent = `⚠ Đọc được file nhưng không tìm thấy mục I/II/III đúng mẫu trong "${file.name}".`;
+        return;
+      }
+      window.__managerReviewData = sections;
+      const found = ['I', 'II', 'III'].filter((k,i) => [sections.tinhHinhHocTap, sections.congTacToChuc, sections.danhGiaChung][i]);
+      status3El.className = 'status ok';
+      status3El.textContent = `✓ Đã đọc "${file.name}" — lấy được nội dung mục ${found.join(', ') || '(rỗng)'}. Bấm "Dựng báo cáo" để thêm vào cuối báo cáo.`;
+    } catch (err) {
+      window.__managerReviewData = null;
+      status3El.className = 'status err';
+      status3El.textContent = 'Lỗi đọc file: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
 
 function guessMaLopFromFileName(name) {
   const m = name.match(/([A-ZÀ-Ỹ]{2,6})[_\s-]+(\d{2}[-_]\d{2})/i);
@@ -625,14 +815,23 @@ function parseColumnsFromRows(headers, responses) {
   const instructorMap = new Map();
   const instructorOrder = [];
 
-  const oldInstructorRe = /Đánh giá Giảng viên\s*:?\s*(.*?)\s*-\s*Nội dung giảng:\s*(.*?)\s*\[(.*)\]\s*$/;
-  const newInstructorRe = /Đánh giá Giảng viên:?\s*(.*?)\s+-\s+(.*?)\s*\[(.*)\]\s*$/s;
+  // Note: the bracket group below is intentionally non-greedy and NOT anchored to the end of
+  // the string ($), so a header with stray extra text appended after the closing "]" still
+  // matches and only the bracketed criterion text is captured (see cleanQuestionLabel for the
+  // same fix applied to the generic fallback path).
+  const oldInstructorRe = /Đánh giá Giảng viên\s*:?\s*(.*?)\s*-\s*Nội dung giảng:\s*(.*?)\s*\[(.*?)\]/s;
+  const newInstructorRe = /Đánh giá Giảng viên:?\s*(.*?)\s+-\s+(.*?)\s*\[(.*?)\]/s;
   const nameRe = /[Gg]i[ảa]ng\s*vi[êe]n\s*[-:]?\s*([^\n\[]+)/;
   const assistantRe = /Tr[ợo]\s*[Gg]i[ảa]ng\s*[-:]?\s*([^\n\[]+)/;
 
   function cleanQuestionLabel(h, instructorName) {
     let s = h;
-    const br = s.match(/\[(.*)\]\s*$/s);
+    // Match the FIRST bracket pair, not one anchored to the end of the string. Some Google
+    // Forms exports append extra free text after the closing "]" (e.g. a stray topic/spec
+    // note glued onto the last criterion column), and an end-anchored regex would then fail
+    // to match at all, leaving the whole messy header as the label instead of just the
+    // intended criterion text inside the brackets.
+    const br = s.match(/\[(.*?)\]/s);
     if (br) return br[1].trim();
     s = s.replace(/^[^\n]*[Gg]i[ảa]ng\s*vi[êe]n\s+[^\n]*\n/, '\n');
     const parts = s.split('\n');
@@ -974,6 +1173,8 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   fileInput.value=''; fieldsBlock.classList.add('hidden'); reportRoot.innerHTML=''; printBlock.style.display='none';
   statusEl.className='status'; statusEl.textContent='';
   document.getElementById('formatNote').textContent='';
+  fileInput3.value=''; window.__managerReviewData = null;
+  status3El.className='status'; status3El.textContent='';
 });
 
 document.getElementById('renderBtn').addEventListener('click', () => {
@@ -990,6 +1191,7 @@ document.getElementById('renderBtn').addEventListener('click', () => {
     doiTuong: document.getElementById('doiTuongField').value,
     noiDungRows: getNoiDungRows(),
     noiDungTong: document.getElementById('noiDungTongThoiLuong').value.trim(),
+    instructorSurvey: window.__instructorSurveyData || null,
     triGiaTap: triGiaTapVal,
     thamGia: thamGiaVal,
     danhGia: danhGiaVal,
@@ -1001,6 +1203,7 @@ document.getElementById('renderBtn').addEventListener('click', () => {
     approverRole: document.getElementById('approverRole').value,
     huuIch: document.getElementById('huuIchField').value.trim(),
     gopY: document.getElementById('gopYField').value.trim(),
+    managerReview: window.__managerReviewData || null,
     segmentKpi: (p.segmented && p.segments && p.segments.length) ? getSegmentKpiValues() : null,
   };
   renderReport(p, overrides);
@@ -1193,6 +1396,108 @@ function buildSummaryTableHtml(p) {
   `;
 }
 
+// Parser for the separate "Phiếu khảo sát ý kiến Giảng viên về lớp học" file — each row is one
+// instructor's own evaluation of the class (not an aggregate of many respondents).
+function parseInstructorSurveyRows(rows) {
+  const headers = rows[0] || [];
+  const dataRows = rows.slice(1).filter(r => r && r.some(v => v!==null && v!==''));
+  if (!dataRows.length) return [];
+
+  // Matched by wording, not by fixed "1./2./3./4." numbering or column position — the form
+  // this file comes from has been re-numbered/reordered more than once (e.g. a "Học vị/Chức
+  // vụ" column was inserted before "Đơn vị công tác", and the criteria columns dropped their
+  // old "3. Đánh giá, nhận xét về lớp học [...]" prefix down to a bare " [...]"), so relying
+  // on position or a leading digit breaks every time the sheet is re-exported.
+  let nameCol = -1, orgCol = -1, titleCol = -1;
+  const criteriaCols = [];
+  const commentCols = [];
+  headers.forEach((hRaw, i) => {
+    if (i===0) return; // timestamp
+    const h = (hRaw||'').toString().trim();
+    if (!h) return;
+
+    // Criterion (rated) columns: header text ends in "[...]", regardless of any numbered
+    // prefix before it.
+    const bracket = h.match(/\[(.*)\]\s*$/s);
+    if (bracket) { criteriaCols.push({ index:i, label: bracket[1].trim() }); return; }
+
+    if (nameCol===-1 && /h[ọo]\s*v[àa]\s*t[êe]n/i.test(h)) { nameCol = i; return; }
+    if (orgCol===-1 && /đ[ơo]n\s*v[ịi]\s*c[ôo]ng\s*t[áa]c/i.test(h)) { orgCol = i; return; }
+    // "học vị" (degree) — deliberately NOT "v[ịi]" here, since that loosened form also
+    // matches "học viên" (student) and misclassifies other columns as the title column.
+    if (titleCol===-1 && /(h[ọo]c\s*v[ị]|ch[ứu]c\s*v[ụu])/i.test(h)) { titleCol = i; return; }
+    if (h.toLowerCase().replace(/\s+/g,' ').trim() === 'điểm số') return;
+
+    // Free-text comment columns: a short numbered question, e.g. "1. Nhận xét chung..." or
+    // the older "Câu 1. Nhận xét chung...". Take the LAST line of the header (some exports
+    // still prefix the first comment column with a "4. Nhận xét và đề xuất của Giảng viên"
+    // group heading on its own line) and normalize to "Câu N. ..." either way, so the label
+    // looks the same regardless of which export format produced it.
+    const last = h.split('\n').pop().trim();
+    const numbered = last.match(/^(?:c[âa]u\s*)?(\d+)\.\s*(.+)$/i);
+    if (numbered) {
+      const label = `Câu ${numbered[1]}. ${numbered[2].replace(/\s+/g,' ').trim()}`;
+      commentCols.push({ index:i, label });
+    }
+  });
+
+  const scoreMap = { 'xuất sắc':5, 'tốt':4, 'khá':3, 'bình thường':2, 'hạn chế':1 };
+  function scoreFromValue(val) {
+    if (val===null || val===undefined || val==='') return null;
+    const s = val.toString().trim();
+    // Tolerant of typos in the unit word itself (some exports have "4 điếm" instead of
+    // "4 điểm") — the digit is the reliable part, so extract that first.
+    const m1 = s.match(/(\d)\s*[đd]i[ểêế]m/i);
+    if (m1) return parseInt(m1[1]);
+    const lower = s.toLowerCase();
+    for (const key of Object.keys(scoreMap)) {
+      if (lower.includes(key)) return scoreMap[key];
+    }
+    return null;
+  }
+
+  return dataRows.map(r => {
+    const name = nameCol>=0 ? (r[nameCol]||'').toString().trim() : '';
+    const title = titleCol>=0 ? (r[titleCol]||'').toString().trim() : '';
+    const org = orgCol>=0 ? (r[orgCol]||'').toString().trim() : '';
+    const orgLine = [title, org].filter(Boolean).join(' · ');
+    const criteria = criteriaCols.map(c => {
+      const scoreText = (r[c.index]||'').toString().trim();
+      return { label: c.label, scoreText, score: scoreFromValue(r[c.index]) };
+    }).filter(c => c.scoreText);
+    const comments = commentCols.map(c => ({ label: c.label, text: (r[c.index]||'').toString().trim() }))
+      .filter(c => c.text);
+    return { name, org: orgLine, criteria, comments };
+  }).filter(e => e.name || e.criteria.length);
+}
+
+function buildInstructorSurveySectionHtml(entries) {
+  if (!entries || !entries.length) return '';
+  const cards = entries.map(e => {
+    const criteriaHtml = e.criteria.map(c => {
+      const pct = c.score ? (c.score/5*100) : 0;
+      return `
+      <div class="gv-metric">
+        <div class="gv-metric-label"><span>${escapeHtml(c.label)}</span><span>${escapeHtml(c.scoreText)}</span></div>
+        <div class="gv-bar-track"><div class="gv-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+    const criteriaWrapped = criteriaHtml ? `<div class="gv-metrics-row">${criteriaHtml}</div>` : '';
+    const commentsHtml = e.comments.map(c =>
+      `<div style="margin-top:6px;"><b>${escapeHtml(c.label)}:</b> ${escapeHtml(c.text).replace(/\n/g,'<br>')}</div>`
+    ).join('');
+    return `
+    <div class="gv-card">
+      <div class="gv-top">
+        <div><div class="gv-name">${escapeHtml(e.name) || 'Giảng viên'}</div><div class="gv-spec">${escapeHtml(e.org)}</div></div>
+      </div>
+      ${criteriaWrapped}
+      ${commentsHtml ? `<div style="margin-top:8px; font-size:10.5px; color:#374151; line-height:1.5;">${commentsHtml}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="gv-grid stack">${cards}</div>`;
+}
+
 function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
   const items = p.items;
   const triGiaTap = badgeLabel ? p.triGiaTap : ov.triGiaTap;
@@ -1212,13 +1517,12 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
   let secNum = 1; // 1. THÔNG TIN CHUNG VỀ LỚP HỌC (always shown)
   const curriculumRows = (ov.noiDungRows||[]).filter(r => r.noiDung || r.thoiLuong);
   const numChuongTrinh = curriculumRows.length ? ++secNum : null;
-  const numNoiDung = items1.length ? ++secNum : null;
-  const numPhuongPhap = items2.length ? ++secNum : null;
-  const numToChuc = items3.length ? ++secNum : null;
-  const numGiangVien = ++secNum; // always shown
-  const numDanhGiaChung = chungItems.length ? ++secNum : null;
-  const numHuuIch = ov.huuIch ? ++secNum : null;
-  const numGopY = ov.gopY ? ++secNum : null;
+  const numHocVienDanhGia = ++secNum; // wrapper: HỌC VIÊN ĐÁNH GIÁ (always shown — contains d., which is always shown)
+  const hasInstructorSurvey = ov.instructorSurvey && ov.instructorSurvey.length;
+  const numGiangVienDanhGia = hasInstructorSurvey ? ++secNum : null;
+  const mgrReview = ov.managerReview;
+  const hasMgrReview = mgrReview && (mgrReview.tinhHinhHocTap || mgrReview.congTacToChuc || mgrReview.danhGiaChung);
+  const numCanBoQuanLyLop = hasMgrReview ? ++secNum : null;
 
   const instructors = (!badgeLabel && ov.instructorsManual && ov.instructorsManual.length)
     ? ov.instructorsManual.map((entry, i) => {
@@ -1337,8 +1641,10 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
         </tbody>
       </table>` : ''}
 
+      <div class="section-title"><span class="bar"></span>${numHocVienDanhGia}. HỌC VIÊN ĐÁNH GIÁ</div>
+
       ${items1.length ? `
-      <div class="section-title"><span class="bar"></span>${numNoiDung}. ĐÁNH GIÁ VỀ NỘI DUNG ĐÀO TẠO (Thang điểm 4)</div>
+      <div class="gv-sub-title">a. ĐÁNH GIÁ VỀ NỘI DUNG ĐÀO TẠO (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1351,7 +1657,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       </div>` : ''}
 
       ${items2.length ? `
-      <div class="section-title"><span class="bar"></span>${numPhuongPhap}. ĐÁNH GIÁ VỀ PHƯƠNG PHÁP, HÌNH THỨC ĐÀO TẠO (Thang điểm 4)</div>
+      <div class="gv-sub-title">b. ĐÁNH GIÁ VỀ PHƯƠNG PHÁP, HÌNH THỨC ĐÀO TẠO (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1361,7 +1667,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       <div class="col-grid">${colCards}</div>` : ''}
 
       ${items3.length ? `
-      <div class="section-title"><span class="bar"></span>${numToChuc}. CÔNG TÁC TỔ CHỨC, CƠ SỞ VẬT CHẤT (Thang điểm 4)</div>
+      <div class="gv-sub-title">c. CÔNG TÁC TỔ CHỨC, CƠ SỞ VẬT CHẤT (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1373,7 +1679,8 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
         <div class="axis"><span>0%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span><span>100%</span></div>
       </div>` : ''}
 
-      <div class="section-title"><span class="bar"></span>${numGiangVien}. ĐÁNH GIÁ ĐỘI NGŨ GIẢNG VIÊN (Thang điểm 5)</div>
+      <div class="gv-sub-title">d. ĐÁNH GIÁ GIẢNG VIÊN (Thang điểm 5)</div>
+
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Xuất sắc (5đ)</span>
         <span><span class="dot" style="background:#7FC8A9;"></span>Tốt (4đ)</span>
@@ -1384,7 +1691,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       <div class="gv-grid ${single?'single':''}">${gvCards}</div>
 
       ${chungItems.length ? `
-      <div class="section-title"><span class="bar"></span>${numDanhGiaChung}. ĐÁNH GIÁ CHUNG (Thang điểm 5)</div>
+      <div class="gv-sub-title">e. ĐÁNH GIÁ CHUNG (Thang điểm 5)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Rất rõ rệt (5đ)</span>
         <span><span class="dot" style="background:#7FC8A9;"></span>Tốt (4đ)</span>
@@ -1398,12 +1705,25 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       </div>` : ''}
 
       ${ov.huuIch ? `
-      <div class="section-title"><span class="bar"></span>${numHuuIch}. NỘI DUNG HỮU ÍCH NHẤT CỦA KHÓA HỌC</div>
+      <div class="gv-sub-title">f. NỘI DUNG HỮU ÍCH NHẤT CỦA KHÓA HỌC</div>
       <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(ov.huuIch).replace(/\n/g,'<br>')}</div>` : ''}
 
       ${ov.gopY ? `
-      <div class="section-title"><span class="bar"></span>${numGopY}. Ý KIẾN GÓP Ý KHÁC</div>
+      <div class="gv-sub-title">g. Ý KIẾN GÓP Ý KHÁC</div>
       <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(ov.gopY).replace(/\n/g,'<br>')}</div>` : ''}
+
+      ${hasInstructorSurvey ? `
+      <div class="section-title"><span class="bar"></span>${numGiangVienDanhGia}. GIẢNG VIÊN ĐÁNH GIÁ</div>
+      ${buildInstructorSurveySectionHtml(ov.instructorSurvey)}` : ''}
+
+      ${hasMgrReview ? `
+      <div class="section-title"><span class="bar"></span>${numCanBoQuanLyLop}. CÁN BỘ QUẢN LÝ LỚP ĐÁNH GIÁ</div>
+      <div class="gv-sub-title">a. Tình hình học tập và chấp hành kỷ luật</div>
+      <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(mgrReview.tinhHinhHocTap || '—').replace(/\n/g,'<br>')}</div>
+      <div class="gv-sub-title">b. Công tác tổ chức và các vấn đề phát sinh</div>
+      <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(mgrReview.congTacToChuc || '—').replace(/\n/g,'<br>')}</div>
+      <div class="gv-sub-title">c. Đánh giá chung và Kiến nghị</div>
+      <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(mgrReview.danhGiaChung || '—').replace(/\n/g,'<br>')}</div>` : ''}
 
       ${showSignature ? `
       <div class="tail-group">
