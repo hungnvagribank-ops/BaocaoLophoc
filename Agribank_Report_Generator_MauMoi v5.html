@@ -323,12 +323,22 @@
             <input type="text" id="locName">
           </div>
           <div class="field">
-            <label>Thời gian hiển thị</label>
-            <input type="text" id="timeName">
-          </div>
-          <div class="field">
             <label>Đối tượng</label>
             <textarea id="doiTuongField" rows="2" placeholder="VD: Cán bộ quản lý, chuyên viên..."></textarea>
+          </div>
+          <div style="grid-column: 1 / -1; display:grid; grid-template-columns: repeat(3,1fr); gap:14px;">
+            <div class="field">
+              <label>Ngày bắt đầu (hiển thị trên báo cáo &amp; điền Google Sheet)</label>
+              <input type="date" id="ngayBatDauField" lang="vi">
+            </div>
+            <div class="field">
+              <label>Ngày kết thúc (hiển thị trên báo cáo &amp; điền Google Sheet)</label>
+              <input type="date" id="ngayKetThucField" lang="vi">
+            </div>
+            <div class="field">
+              <label>Ngày lập báo cáo (ở dòng "Hà Nội, ngày...")</label>
+              <input type="date" id="ngayLapBaoCaoField" lang="vi">
+            </div>
           </div>
           <div class="field">
             <label>Agribank Chi nhánh (dùng cho báo cáo CSVC)</label>
@@ -402,12 +412,21 @@
     </div>
 
     <div class="app-card no-print" id="printBlock" style="display:none;">
-      <div class="btn-row" style="margin-top:0;">
+      <div class="btn-row" style="margin-top:0; align-items:center;">
         <button class="btn btn-primary" id="printBtn">🖨️ In</button>
         <button class="btn btn-secondary" id="savePdfBtn">💾 Lưu PDF</button>
         <button class="btn btn-secondary" id="exportCsvcBtn">📄 Xuất Word báo cáo CSVC</button>
+        <button class="btn btn-secondary" id="exportSheetBtn">📋 Xuất dữ liệu Google Sheet</button>
+        <div style="display:flex; align-items:center; gap:6px; margin-left:auto; border:1px solid var(--border); border-radius:8px; padding:5px 8px;">
+          <span style="font-size:12px; color:#6B7280; white-space:nowrap;">Giãn dòng:</span>
+          <button type="button" id="zoomOutBtn" title="Thu gọn — dùng khi trang cuối chỉ còn mỗi phần ký" style="width:24px; height:24px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer; font-size:14px; line-height:1;">－</button>
+          <span id="zoomValue" style="min-width:36px; text-align:center; font-size:12px; font-weight:600; color:var(--maroon-dark);">100%</span>
+          <button type="button" id="zoomInBtn" title="Giãn ra" style="width:24px; height:24px; border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer; font-size:14px; line-height:1;">＋</button>
+          <button type="button" id="zoomResetBtn" title="Về mặc định 100%" style="border:1px solid var(--border); border-radius:6px; background:#fff; cursor:pointer; font-size:11px; padding:0 8px; height:24px;">Mặc định</button>
+        </div>
       </div>
       <div id="csvcStatus" class="status" style="margin-top:6px;"></div>
+      <div id="sheetExportBlock" class="hidden" style="margin-top:14px; display:flex; flex-direction:column; gap:12px;"></div>
     </div>
   </div>
 
@@ -868,11 +887,11 @@ function parseColumnsFromRows(headers, responses) {
     let insInfo = null;
     const oldM = h.match(oldInstructorRe);
     if (oldM) {
-      insInfo = { name: oldM[1].trim(), spec: oldM[2].trim(), criterion: oldM[3].trim() };
+      insInfo = { name: stripHonorific(oldM[1].trim()), spec: oldM[2].trim(), criterion: oldM[3].trim() };
     } else {
       const newM = h.match(newInstructorRe);
       if (newM) {
-        insInfo = { name: newM[1].trim(), spec: newM[2].trim(), criterion: newM[3].trim() };
+        insInfo = { name: stripHonorific(newM[1].trim()), spec: newM[2].trim(), criterion: newM[3].trim() };
       } else {
         // Only look for the instructor's name in the part of the header BEFORE the
         // bracketed criterion, otherwise phrases like "...của giảng viên]" inside the
@@ -880,10 +899,10 @@ function parseColumnsFromRows(headers, responses) {
         const bIdx = h.indexOf('[');
         const preBracket = bIdx >= 0 ? h.slice(0, bIdx) : h;
         if (nameRe.test(preBracket)) {
-          const nm = preBracket.match(nameRe)[1].trim();
+          const nm = stripHonorific(preBracket.match(nameRe)[1].trim());
           insInfo = { name: nm, spec: '', criterion: cleanQuestionLabel(h, nm) };
         } else if (assistantRe.test(preBracket)) {
-          const nm = preBracket.match(assistantRe)[1].trim();
+          const nm = stripHonorific(preBracket.match(assistantRe)[1].trim());
           insInfo = { name: 'Trợ giảng ' + nm, spec: '', criterion: cleanQuestionLabel(h, nm) };
         }
       }
@@ -1037,7 +1056,7 @@ document.getElementById('addNoiDungRowBtn').addEventListener('click', addNoiDung
 addNoiDungRow();
 
 function getInstructorRowValues() {
-  const names = [...document.querySelectorAll('.instructorNameInput')].map(i => i.value);
+  const names = [...document.querySelectorAll('.instructorNameInput')].map(i => stripHonorific(i.value));
   const specs = [...document.querySelectorAll('.instructorSpecInput')].map(i => i.value);
   return names.map((name,i) => ({ name, spec: specs[i]||'' }));
 }
@@ -1125,7 +1144,9 @@ function fillFields(p) {
   document.getElementById('maLopField').value = p.maLop || guessMaLopFromFileName(currentFileName) || '';
   document.getElementById('progName').value = p.chuongTrinh ? shorten(p.chuongTrinh) : '';
   document.getElementById('locName').value = p.diaDiem || '';
-  document.getElementById('timeName').value = p.thoiGian || '';
+  document.getElementById('ngayBatDauField').value = toISODate(p.thoiGian);
+  document.getElementById('ngayKetThucField').value = toISODate(p.thoiGian);
+  document.getElementById('ngayLapBaoCaoField').value = todayISODate();
   document.getElementById('doiTuongField').value = '';
   resetNoiDungRows();
   const singleKpiFields = document.getElementById('singleKpiFields');
@@ -1169,6 +1190,40 @@ function shorten(s) {
   return s.replace(/^Chương trình đào tạo đào tạo\s*/i,'Chương trình ').split(';')[0].trim();
 }
 
+// The 3 date fields below are native <input type="date"> pickers, so their raw .value is
+// always ISO "YYYY-MM-DD" (or "" when empty) — fromISODate() converts that to the
+// "DD/MM/YYYY" format used everywhere else in the report and the Google Sheet export;
+// toISODate() does the reverse, for prefilling a date input from a free-text/Excel value.
+function fromISODate(iso) {
+  const m = (iso||'').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+function toISODate(str) {
+  const m = (str||'').trim().match(/^(\d{1,2})\D+(\d{1,2})\D+(\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : '';
+}
+function todayISODate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// "Thời gian" shown on the report header is derived from Ngày bắt đầu / Ngày kết thúc —
+// a single date when they're the same (or one is blank), otherwise "bắt đầu - kết thúc".
+function computeThoiGianDisplay() {
+  const start = fromISODate(document.getElementById('ngayBatDauField').value);
+  const end = fromISODate(document.getElementById('ngayKetThucField').value);
+  if (start && end) return start === end ? start : `${start} - ${end}`;
+  return start || end || '';
+}
+// Parses the "Ngày lập báo cáo" value (already "DD/MM/YYYY" via fromISODate) into
+// {dd,mm,yyyy} for the "Hà Nội, ngày ... tháng ... năm ..." footer line. Falls back to
+// today's date if the field is empty, so the footer never ends up blank.
+function parseDdMmYyyy(str) {
+  const m = (str||'').trim().match(/^(\d{1,2})\D+(\d{1,2})\D+(\d{4})$/);
+  if (m) return { dd: m[1].padStart(2,'0'), mm: m[2].padStart(2,'0'), yyyy: m[3] };
+  const today = new Date();
+  return { dd: String(today.getDate()).padStart(2,'0'), mm: String(today.getMonth()+1).padStart(2,'0'), yyyy: String(today.getFullYear()) };
+}
+
 document.getElementById('resetBtn').addEventListener('click', () => {
   fileInput.value=''; fieldsBlock.classList.add('hidden'); reportRoot.innerHTML=''; printBlock.style.display='none';
   statusEl.className='status'; statusEl.textContent='';
@@ -1187,7 +1242,8 @@ document.getElementById('renderBtn').addEventListener('click', () => {
     maLop: document.getElementById('maLopField').value || p.maLop,
     chuongTrinh: document.getElementById('progName').value,
     diaDiem: document.getElementById('locName').value,
-    thoiGian: document.getElementById('timeName').value,
+    thoiGian: computeThoiGianDisplay(),
+    ngayLapBaoCao: fromISODate(document.getElementById('ngayLapBaoCaoField').value),
     doiTuong: document.getElementById('doiTuongField').value,
     noiDungRows: getNoiDungRows(),
     noiDungTong: document.getElementById('noiDungTongThoiLuong').value.trim(),
@@ -1208,11 +1264,35 @@ document.getElementById('renderBtn').addEventListener('click', () => {
   };
   renderReport(p, overrides);
   printBlock.style.display='block';
+  reportZoomPct = 100;
+  applyReportZoom();
   reportRoot.scrollIntoView({behavior:'smooth'});
 });
 
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 document.getElementById('savePdfBtn').addEventListener('click', () => window.print());
+
+// ---- Giãn dòng: co/giãn toàn bộ nội dung báo cáo để tự khắc phục các trường hợp lệch trang
+// khi in/lưu PDF (ví dụ trang cuối chỉ còn mỗi phần chữ ký) mà không cần sửa lại dữ liệu ----
+let reportZoomPct = 100;
+function applyReportZoom() {
+  const root = document.getElementById('reportRoot');
+  if (root) root.style.zoom = (reportZoomPct / 100);
+  const label = document.getElementById('zoomValue');
+  if (label) label.textContent = reportZoomPct + '%';
+}
+document.getElementById('zoomOutBtn').addEventListener('click', () => {
+  reportZoomPct = Math.max(80, reportZoomPct - 4);
+  applyReportZoom();
+});
+document.getElementById('zoomInBtn').addEventListener('click', () => {
+  reportZoomPct = Math.min(120, reportZoomPct + 4);
+  applyReportZoom();
+});
+document.getElementById('zoomResetBtn').addEventListener('click', () => {
+  reportZoomPct = 100;
+  applyReportZoom();
+});
 
 // ---- Xuất Word báo cáo CSVC (Cơ sở vật chất) từ file mẫu form_CSVC.docx ----
 function base64ToUint8Array(base64) {
@@ -1266,7 +1346,7 @@ document.getElementById('exportCsvcBtn').addEventListener('click', () => {
     const chiNhanh = document.getElementById('chiNhanhField').value.trim();
     const data = {
       chi_nhanh_full: 'Agribank Chi nhánh ' + (chiNhanh || '...........'),
-      thoi_gian: document.getElementById('timeName').value || '',
+      thoi_gian: computeThoiGianDisplay() || '',
       ma_lop: document.getElementById('maLopField').value || '',
       chuong_trinh: document.getElementById('progName').value || '',
       ...csvcItemToTags(csvc, 'csvc'),
@@ -1290,10 +1370,155 @@ document.getElementById('exportCsvcBtn').addEventListener('click', () => {
   }
 });
 
+// ---- Xuất dữ liệu để dán vào Google Sheet tổng hợp (CSVC / NDĐT / PP HT ĐT / GV / ĐGC) ----
+function pickCsvcSubItems(items) {
+  return {
+    tc: items.find(it => /công tác tổ chức/i.test(it.label)),
+    csvc: items.find(it => /cơ sở vật chất/i.test(it.label)),
+    pvhc: items.find(it => /phục vụ hậu cần/i.test(it.label)),
+  };
+}
+function shCnt(it, lvl) { return it ? (it.counts[lvl] || 0) : ''; }
+function shBuckets(p) {
+  if (p.segmented && p.segments && p.segments.length) {
+    return p.segments.map(s => ({ label: s.label, items: s.items, chungMetrics: s.chungMetrics, instructors: s.instructors }));
+  }
+  return [{ label: null, items: p.items, chungMetrics: p.chungMetrics, instructors: p.instructors }];
+}
+function shFormatLabel(bucket) {
+  if (bucket.label) {
+    if (/trực\s*tiếp/i.test(bucket.label)) return 'Trực tiếp';
+    if (/trực\s*tuyến/i.test(bucket.label)) return 'Trực tuyến';
+    return bucket.label;
+  }
+  return 'Trực tiếp';
+}
+function shTsvRow(cells) {
+  return cells.map(c => (c===null||c===undefined) ? '' : String(c)).join('\t');
+}
+function buildGoogleSheetExport(p) {
+  const maLop = document.getElementById('maLopField').value.trim();
+  const chuongTrinh = maLop.split('/')[0].trim();
+  const diaDiem = document.getElementById('locName').value.trim();
+  const ngayBD = fromISODate(document.getElementById('ngayBatDauField').value);
+  const ngayKT = fromISODate(document.getElementById('ngayKetThucField').value);
+  const cbql = document.getElementById('lapBangField').value.trim();
+  const buckets = shBuckets(p);
+  const sheets = { CSVC: [], NDDT: [], PPHTDT: [], GV: [], DGC: [] };
+
+  buckets.forEach(b => {
+    const hinhThuc = shFormatLabel(b);
+    const prefix = [chuongTrinh, maLop, hinhThuc, ngayBD, ngayKT];
+    const prefixWithDiaDiem = [diaDiem, chuongTrinh, maLop, hinhThuc, ngayBD, ngayKT];
+
+    const nd = (b.items||[]).filter(it => it.group===1);
+    if (nd.length) {
+      const row = [...prefix];
+      for (let i=0;i<3;i++) { const it = nd[i]; row.push(shCnt(it,4), shCnt(it,3), shCnt(it,2), shCnt(it,1)); }
+      sheets.NDDT.push(shTsvRow(row));
+    }
+
+    const pp = (b.items||[]).filter(it => it.group===2);
+    if (pp.length) {
+      const row = [...prefix];
+      for (let i=0;i<2;i++) { const it = pp[i]; row.push(shCnt(it,4), shCnt(it,3), shCnt(it,2), shCnt(it,1)); }
+      sheets.PPHTDT.push(shTsvRow(row));
+    }
+
+    const cs = pickCsvcSubItems((b.items||[]).filter(it => it.group===3));
+    if (cs.tc || cs.csvc || cs.pvhc) {
+      const row = [...prefixWithDiaDiem];
+      [cs.tc, cs.csvc, cs.pvhc].forEach(it => row.push(shCnt(it,4), shCnt(it,3), shCnt(it,2), shCnt(it,1)));
+      sheets.CSVC.push(shTsvRow(row));
+    }
+
+    if (b.chungMetrics && b.chungMetrics.length) {
+      const row = [...prefix];
+      const totals = [];
+      for (let i=0;i<2;i++) {
+        const it = b.chungMetrics[i];
+        row.push(shCnt(it,5), shCnt(it,4), shCnt(it,3), shCnt(it,2), shCnt(it,1));
+        totals.push(it ? it.total : '');
+      }
+      row.push(...totals);
+      sheets.DGC.push(shTsvRow(row));
+    }
+
+    (b.instructors||[]).forEach(ins => {
+      const m = ins.metrics || [];
+      const kt = m.find(x => /kiến thức/i.test(x.label)) || m[0];
+      const kn = m.find(x => /kỹ năng/i.test(x.label)) || m[1];
+      const td = m.find(x => /thái độ/i.test(x.label)) || m[2];
+      // Trailing '' after spec reserves the "Số tiết" column in the target sheet — the app
+      // doesn't track số tiết giảng dạy per giảng viên yet, so it's left blank to fill in by
+      // tay; without this placeholder every score after it (and CBQL at the very end) shifts
+      // one column to the left when pasted.
+      const row = [...prefix, '', '', '', '', '', '', '', ins.name || '', ins.spec || '', ''];
+      [kt, kn, td].forEach(it => row.push(shCnt(it,5), shCnt(it,4), shCnt(it,3), shCnt(it,2), shCnt(it,1)));
+      row.push(cbql);
+      sheets.GV.push(shTsvRow(row));
+    });
+  });
+  return sheets;
+}
+function renderSheetExportUI(sheets) {
+  const block = document.getElementById('sheetExportBlock');
+  block.classList.remove('hidden');
+  const names = {
+    CSVC: 'CSVC — Công tác tổ chức, cơ sở vật chất',
+    NDDT: 'NDĐT — 2. Đánh giá về Nội dung đào tạo',
+    PPHTDT: 'PP HT ĐT — 3. Đánh giá về phương pháp, hình thức đào tạo',
+    GV: 'GV — Đánh giá giảng viên',
+    DGC: 'ĐGC — Đánh giá chung',
+  };
+  let html = '';
+  Object.keys(names).forEach(key => {
+    const rows = sheets[key];
+    if (!rows || !rows.length) return;
+    const joined = rows.join('\n');
+    html += `<div style="border:1px solid var(--border); border-radius:10px; padding:12px 14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:10px; flex-wrap:wrap;">
+        <b style="font-size:12.5px; color:var(--maroon-dark);">Sheet "${key}" — ${escapeHtml(names[key])} (${rows.length} dòng)</b>
+        <button type="button" class="btn btn-secondary sheet-copy-btn" style="padding:5px 12px; font-size:11.5px;">📋 Copy để dán vào Sheet</button>
+      </div>
+      <textarea readonly wrap="off" rows="${Math.min(rows.length,4)}" style="width:100%; font-size:11px; font-family:monospace; border:1px solid var(--border); border-radius:6px; padding:8px; resize:vertical; white-space:pre; overflow-x:auto;">${escapeHtml(joined)}</textarea>
+    </div>`;
+  });
+  block.innerHTML = html || '<div class="status">Không tìm thấy dữ liệu phù hợp để xuất cho bất kỳ sheet nào.</div>';
+  block.querySelectorAll('.sheet-copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ta = btn.closest('div').parentElement.querySelector('textarea');
+      const text = ta.value;
+      navigator.clipboard.writeText(text).then(() => {
+        const old = btn.textContent; btn.textContent = '✓ Đã copy'; setTimeout(() => btn.textContent = old, 1500);
+      }).catch(() => {
+        ta.select();
+        try { document.execCommand('copy'); btn.textContent = '✓ Đã copy'; setTimeout(() => btn.textContent = '📋 Copy để dán vào Sheet', 1500); }
+        catch (e) { alert('Không copy tự động được — hãy bôi đen và copy thủ công từ ô bên trên.'); }
+      });
+    });
+  });
+}
+document.getElementById('exportSheetBtn').addEventListener('click', () => {
+  const p = window.__lastParsed;
+  if (!p) { alert('Vui lòng tạo báo cáo trước.'); return; }
+  if (!document.getElementById('maLopField').value.trim()) { alert('Vui lòng nhập Mã lớp trước khi xuất.'); return; }
+  const sheets = buildGoogleSheetExport(p);
+  renderSheetExportUI(sheets);
+  document.getElementById('sheetExportBlock').scrollIntoView({ behavior:'smooth', block:'start' });
+});
+
 function escapeHtml(s) {
   return (s||'').toString()
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Strips a leading "Ông"/"Bà" honorific from a giảng viên name, wherever the name is read in
+// from a file or typed in manually — applied once at the source so every place the name is
+// later displayed or exported (report, Google Sheet export, etc.) is already clean.
+function stripHonorific(name) {
+  return (name||'').toString().replace(/^(?:Ông|Bà)\.?\s+/i, '').trim();
 }
 
 function seg(pctVal, cls) {
@@ -1457,7 +1682,7 @@ function parseInstructorSurveyRows(rows) {
   }
 
   return dataRows.map(r => {
-    const name = nameCol>=0 ? (r[nameCol]||'').toString().trim() : '';
+    const name = nameCol>=0 ? stripHonorific((r[nameCol]||'').toString().trim()) : '';
     const title = titleCol>=0 ? (r[titleCol]||'').toString().trim() : '';
     const org = orgCol>=0 ? (r[orgCol]||'').toString().trim() : '';
     const orgLine = [title, org].filter(Boolean).join(' · ');
@@ -1583,10 +1808,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
     </div>`;
   }).join('');
 
-  const today = new Date();
-  const dd = String(today.getDate()).padStart(2,'0');
-  const mm = String(today.getMonth()+1).padStart(2,'0');
-  const yyyy = today.getFullYear();
+  const { dd, mm, yyyy } = parseDdMmYyyy(ov.ngayLapBaoCao);
 
   return `
   <div class="page">
@@ -1644,7 +1866,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       <div class="section-title"><span class="bar"></span>${numHocVienDanhGia}. HỌC VIÊN ĐÁNH GIÁ</div>
 
       ${items1.length ? `
-      <div class="gv-sub-title">a. ĐÁNH GIÁ VỀ NỘI DUNG ĐÀO TẠO (Thang điểm 4)</div>
+      <div class="gv-sub-title">a. Đánh giá về nội dung đào tạo (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1657,7 +1879,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       </div>` : ''}
 
       ${items2.length ? `
-      <div class="gv-sub-title">b. ĐÁNH GIÁ VỀ PHƯƠNG PHÁP, HÌNH THỨC ĐÀO TẠO (Thang điểm 4)</div>
+      <div class="gv-sub-title">b. Đánh giá về phương pháp, hình thức đào tạo (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1667,7 +1889,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       <div class="col-grid">${colCards}</div>` : ''}
 
       ${items3.length ? `
-      <div class="gv-sub-title">c. CÔNG TÁC TỔ CHỨC, CƠ SỞ VẬT CHẤT (Thang điểm 4)</div>
+      <div class="gv-sub-title">c. Công tác tổ chức, cơ sở vật chất (Thang điểm 4)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Tốt (4đ)</span>
         <span><span class="dot" style="background:var(--kha);"></span>Khá (3đ)</span>
@@ -1679,7 +1901,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
         <div class="axis"><span>0%</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span><span>100%</span></div>
       </div>` : ''}
 
-      <div class="gv-sub-title">d. ĐÁNH GIÁ GIẢNG VIÊN (Thang điểm 5)</div>
+      <div class="gv-sub-title">d. Đánh giá giảng viên (Thang điểm 5)</div>
 
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Xuất sắc (5đ)</span>
@@ -1691,7 +1913,7 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       <div class="gv-grid ${single?'single':''}">${gvCards}</div>
 
       ${chungItems.length ? `
-      <div class="gv-sub-title">e. ĐÁNH GIÁ CHUNG (Thang điểm 5)</div>
+      <div class="gv-sub-title">e. Đánh giá chung (Thang điểm 5)</div>
       <div class="legend">
         <span><span class="dot" style="background:var(--tot);"></span>Rất rõ rệt (5đ)</span>
         <span><span class="dot" style="background:#7FC8A9;"></span>Tốt (4đ)</span>
@@ -1705,11 +1927,11 @@ function buildPageHtml(p, ov, badgeLabel, showSignature = false) {
       </div>` : ''}
 
       ${ov.huuIch ? `
-      <div class="gv-sub-title">f. NỘI DUNG HỮU ÍCH NHẤT CỦA KHÓA HỌC</div>
+      <div class="gv-sub-title">f. Nội dung hữu ích nhất của khóa học</div>
       <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(ov.huuIch).replace(/\n/g,'<br>')}</div>` : ''}
 
       ${ov.gopY ? `
-      <div class="gv-sub-title">g. Ý KIẾN GÓP Ý KHÁC</div>
+      <div class="gv-sub-title">g. Ý kiến góp ý khác</div>
       <div class="gv-card" style="margin-bottom:14px; font-size:11.5px; line-height:1.7; color:#374151;">${escapeHtml(ov.gopY).replace(/\n/g,'<br>')}</div>` : ''}
 
       ${hasInstructorSurvey ? `
